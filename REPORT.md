@@ -103,7 +103,3 @@ const nextCursor = hasNext ? items.at(-1).id : null;
 
 - `X-Response-Time` 헤더 및 `meta.executionTimeMs` 로 관찰. 1,000건 인메모리 배열이라 두 방식 모두 1ms 내외로 큰 차이는 없음
 - 실제 DB 에서는 오프셋이 `OFFSET n` 만큼 행을 읽고 버리므로 뒤 페이지일수록 느려지고, 커서는 `id` 인덱스로 시작 위치를 바로 찾아 일정함 (과제 범위상 DB 실측은 생략)
-
-## 6. AI 활용
-
-README 의 "AI 활용 내역" 참고.
