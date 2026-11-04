@@ -42,45 +42,6 @@ npm test           # API 자동 테스트 22개 (서버를 따로 켤 필요 없
 - 조건: `(제목/본문 검색) AND id < cursor` → `limit + 1`개까지만 조회 → `hasNext` 판단
 - 응답 `meta`: `cursor, nextCursor(마지막이면 null), limit, search, hasNext, executionTimeMs`
 
-## 개념 설명
-
-### ① 오프셋 vs 커서 — 어떤 화면에 적합한가
-
-| | 오프셋 (`LIMIT ? OFFSET ?`) | 커서 (`WHERE id < ? ORDER BY id DESC LIMIT ?`) |
-|---|---|---|
-| 적합한 화면 | 관리자 게시판, 검색 결과 목록처럼 **"7페이지로 바로 이동"·전체 개수 표시**가 필요한 곳 | SNS 피드, 댓글, 채팅, 알림처럼 **"더 보기"·무한 스크롤**로 이어 보는 곳 |
-| 장점 | 임의 페이지 이동, 총 페이지 수 표시, 정렬 자유로움 | 뒤 페이지도 일정한 속도(인덱스로 커서 위치를 바로 찾음), 중간에 새 글이 추가돼도 중복·누락 없음 |
-| 단점 | OFFSET이 커질수록 앞의 행을 읽고 버림 → 느려짐. 조회 중 글이 추가/삭제되면 다음 페이지에 중복·누락 발생 | 특정 페이지로 점프 불가, 커서로 쓸 수 있는 **유일하고 정렬된 키**가 필요 (그래서 id DESC 고정) |
-
-### ② 디바운스와 요청 취소의 역할
-
-- **디바운스(300ms)**: 입력이 멈춘 뒤 300ms 동안 추가 입력이 없을 때만 요청을 보냄 → "인덱스"를 빠르게 치면 입력 이벤트는 여러 번이지만 요청은 **1회**. 서버 부하와 불필요한 렌더링을 줄인다. *요청의 개수*를 줄이는 장치.
-- **요청 취소(AbortController)**: 디바운스를 지나 이미 나간 요청이라도, 새 요청을 보낼 때 이전 요청을 `abort()` 한다. 네트워크가 느리면 먼저 보낸 요청의 응답이 나중에 도착해 **최신 결과를 덮어쓰는 경쟁 상태(race condition)** 가 생기는데 이를 막는다. *응답의 순서*를 보장하는 장치.
-- 취소된 fetch 는 `AbortError` 로 reject 되므로 `catch` 에서 `err.name === 'AbortError'` 를 구분해 **에러 화면을 띄우지 않고 무시**한다. 추가로 요청 번호(`requestSeq`)를 비교해, 최신 요청이 아닌 응답은 화면에 반영하지 않도록 이중 방어했다.
-- 둘은 대체 관계가 아니라 보완 관계: 디바운스만 있으면 300ms 이상 간격으로 입력할 때 race 가 생기고, 취소만 있으면 키 입력마다 요청이 나간다.
-
-### ③ `limit + 1` 원리
-
-다음 페이지가 있는지 알려면 원래 `COUNT(*)` 로 전체 개수를 세야 하지만, 커서 방식은 **필요한 것보다 1개 더(limit + 1개)** 요청한다.
-
-- 받아온 개수 `> limit` → 다음 데이터가 존재 → `hasNext = true`, 화면에는 앞의 `limit`개만 보여주고 그 마지막 id 를 `nextCursor` 로 사용
-- 받아온 개수 `≤ limit` → 마지막 페이지 → `hasNext = false`, `nextCursor = null`, 더 보기 버튼 숨김
-
-예) 검색 결과가 정확히 11건이고 `limit=11` → 12개를 요청했는데 11개만 옴 → `hasNext=false` (빈 페이지를 한 번 더 요청하지 않음). `limit=10` → 11개가 옴 → `hasNext=true`. 이 경우를 `npm test` 에서 검증한다.
-
-### ④ `offset`·`totalPages` 계산식
-
-```
-offset     = (page - 1) × limit
-totalPages = max(1, ceil(totalCount / limit))
-page       = min(요청 page, totalPages)      // 범위를 넘으면 마지막 페이지
-hasNext    = page < totalPages,  hasPrev = page > 1
-```
-
-예) 전체 1000건, limit 10 → totalPages = 100, 3페이지의 offset = 20 (id 980~971).
-검색 "InnoDB" 167건, limit 10 → totalPages = ceil(16.7) = 17, 17페이지 offset = 160 (7건).
-결과가 0건이어도 totalPages 는 1 (빈 1페이지)로 두어 `page`가 0이 되는 것을 막는다.
-
 ## 원본 대비 주요 수정 사항
 
 자세한 내용과 테스트 결과는 [REPORT.md](REPORT.md) 참고.
