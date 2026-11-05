@@ -18,6 +18,8 @@
       --warn: #b26b00;
     }
     * { box-sizing: border-box; }
+    /* hidden 속성이 .more-wrap/.paging-bar 의 display:flex 에 덮이지 않도록 */
+    [hidden] { display: none !important; }
     body {
       margin: 0;
       padding: 30px;
@@ -493,7 +495,7 @@
           <span class="post-content">${highlight(p.content, kw)}</span></td>
         <td>${escapeHtml(p.author)}</td>
         <td style="color:#0066cc; font-weight:600;">${p.views.toLocaleString()}</td>
-        <td style="color:#8d9aaf;">${escapeHtml(p.createdAt)}</td>
+        <td style="color:#8d9aaf; white-space:nowrap;">${escapeHtml(p.createdAt)}</td>
       </tr>`).join('');
   }
 
